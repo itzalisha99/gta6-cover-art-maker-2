@@ -72,48 +72,59 @@ function panelRects(layout, w, h) {
   return LAYOUTS[layout].rects(w, h);
 }
 
-/** A retro sun: a filled disc with horizontal slits cut through its lower half. */
+/** A retro sun: a disc painted as horizontal bands, with slits of sky left between them. */
 function drawSlittedSun(ctx, cx, cy, r, color) {
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.clip();
   ctx.fillStyle = color;
-  ctx.fill();
-  ctx.globalCompositeOperation = 'destination-out';
-  var gap = r * 0.22, y = cy + r * 0.08, thick = r * 0.07;
+  var band = r * 0.16, gap = r * 0.10, y = cy - r;
   while (y < cy + r) {
-    ctx.fillRect(cx - r - 2, y, r * 2 + 4, thick);
-    y += gap;
-    thick += r * 0.02;
+    ctx.fillRect(cx - r - 2, y, r * 2 + 4, band);
+    y += band + gap;
   }
   ctx.restore();
 }
 
-/** A small palm silhouette: one leaning trunk and five drooping fronds. */
+/** A small palm silhouette: one leaning trunk, a fan of filled leaf fronds, two coconuts. */
 function drawPalm(ctx, x, y, s, color) {
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = s * 0.07;
   ctx.lineCap = 'round';
+  ctx.lineWidth = s * 0.06;
   ctx.beginPath();
   ctx.moveTo(x, y);
-  ctx.quadraticCurveTo(x + s * 0.12, y - s * 0.55, x + s * 0.3, y - s * 0.95);
+  ctx.quadraticCurveTo(x + s * 0.10, y - s * 0.5, x + s * 0.26, y - s * 0.9);
   ctx.stroke();
-  var topX = x + s * 0.3, topY = y - s * 0.95;
-  for (var i = 0; i < 5; i++) {
-    var a = -Math.PI * (0.08 + i * 0.19);
-    var ex = topX + Math.cos(a) * s * 0.62;
-    var ey = topY + Math.sin(a) * s * 0.42 + s * 0.34;
+  var tx = x + s * 0.26, ty = y - s * 0.9;
+  for (var i = 0; i < 6; i++) {
+    var th = -Math.PI * (0.06 + i * 0.176);
+    var len = s * (0.5 + 0.08 * Math.sin(i * 1.3));
+    var tipX = tx + Math.cos(th) * len;
+    var tipY = ty + Math.sin(th) * len * 0.75 + s * 0.16;
+    var mx = (tx + tipX) / 2, my = (ty + tipY) / 2;
+    var px = -(tipY - ty), py = tipX - tx;
+    var pl = Math.hypot(px, py) || 1;
+    var wd = s * 0.055;
     ctx.beginPath();
-    ctx.moveTo(topX, topY);
-    ctx.quadraticCurveTo(topX + Math.cos(a) * s * 0.4, topY + Math.sin(a) * s * 0.12, ex, ey);
-    ctx.stroke();
+    ctx.moveTo(tx, ty);
+    ctx.quadraticCurveTo(mx + px / pl * wd, my + py / pl * wd - s * 0.05, tipX, tipY);
+    ctx.quadraticCurveTo(mx - px / pl * wd * 0.5, my - py / pl * wd * 0.5 + s * 0.03, tx, ty);
+    ctx.fill();
   }
+  ctx.beginPath();
+  ctx.arc(tx - s * 0.03, ty + s * 0.05, s * 0.045, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(tx + s * 0.04, ty + s * 0.06, s * 0.04, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
-/** One photo, cover-fit into a panel rect, with zoom and pan offsets in -0.5..0.5. */
+/** One photo, cover-fit into a panel rect, with zoom and pan offsets in -0.5..0.5.
+ *  The pan is clamped so the photo always covers the panel, never leaving a gap. */
 function drawPanelPhoto(ctx, img, rect, zoom, panX, panY) {
   if (!img) return;
   var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
@@ -121,6 +132,8 @@ function drawPanelPhoto(ctx, img, rect, zoom, panX, panY) {
   var dw = iw * scale, dh = ih * scale;
   var dx = rect.x + (rect.w - dw) / 2 + panX * rect.w;
   var dy = rect.y + (rect.h - dh) / 2 + panY * rect.h;
+  dx = Math.max(rect.x + rect.w - dw, Math.min(rect.x, dx));
+  dy = Math.max(rect.y + rect.h - dh, Math.min(rect.y, dy));
   ctx.drawImage(img, dx, dy, dw, dh);
 }
 
@@ -169,8 +182,12 @@ function drawCaptionBlock(ctx, w, h, state, grade) {
   var sub = (state.subtitle || '').trim().toUpperCase();
   if (sub) {
     ctx.font = '700 ' + Math.max(12, h * 0.02) + 'px "Arial Narrow", sans-serif';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = grade.ink;
+    ctx.lineWidth = Math.max(1, h * 0.002);
+    ctx.strokeText(sub, w / 2, bandY + bandH * 0.86);
     ctx.fillStyle = grade.text;
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = 0.9;
     ctx.fillText(sub, w / 2, bandY + bandH * 0.86);
     ctx.globalAlpha = 1;
   }
@@ -189,12 +206,6 @@ function drawCover(canvas, state) {
   sky.addColorStop(1, grade.sky[3]);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, w, h);
-
-  // The slitted sun rises behind the caption band, flanked by palms.
-  var bandY = h * 0.74;
-  drawSlittedSun(ctx, w * 0.5, bandY + (h - bandY) * 0.62, Math.min(w, h) * 0.16, grade.sun);
-  drawPalm(ctx, w * 0.045, h * 0.985, Math.min(w, h) * 0.24, grade.ink);
-  drawPalm(ctx, w * 0.955, h * 0.985, Math.min(w, h) * 0.20, grade.ink);
 
   // The three photo panels, each with its own crop and chapter tag.
   var rects = panelRects(state.layout, w, h);
@@ -228,6 +239,12 @@ function drawCover(canvas, state) {
     ctx.strokeRect(r.x + 4, r.y + 4, r.w - 8, r.h - 8);
     drawChapterTag(ctx, r, (state.chapters || [])[i] || '', grade);
   }
+
+  // The slitted sun rises behind the caption, flanked by palms that stay inside the band.
+  var bandY = h * 0.74, bandH = h - bandY;
+  drawSlittedSun(ctx, w * 0.5, bandY + bandH * 0.78, Math.min(w, h) * 0.13, grade.sun);
+  drawPalm(ctx, w * 0.04, h * 0.995, bandH * 0.7, grade.ink);
+  drawPalm(ctx, w * 0.96, h * 0.995, bandH * 0.58, grade.ink);
 
   drawCaptionBlock(ctx, w, h, state, grade);
 }

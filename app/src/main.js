@@ -18,9 +18,9 @@ var state = {
   chapters: ['01 · Arrival', '02 · The Hustle', '03 · Sunset'],
   singlePhoto: true,
   panels: [
-    { img: null, zoom: 1.15, panX: 0, panY: 0 },
-    { img: null, zoom: 1.15, panX: 0, panY: 0 },
-    { img: null, zoom: 1.15, panX: 0, panY: 0 }
+    { img: null, zoom: 1.05, panX: 0, panY: 0 },
+    { img: null, zoom: 1.05, panX: 0, panY: 0 },
+    { img: null, zoom: 1.05, panX: 0, panY: 0 }
   ]
 };
 var selected = 0;
@@ -256,6 +256,18 @@ function runShot() {
     document.getElementById('captionInput').value = state.caption;
   }
   if (q.get('chapters')) state.chapters = q.get('chapters').split('|').slice(0, 3);
+  if (q.get('zooms')) q.get('zooms').split(',').forEach(function (z, i) {
+    if (state.panels[i]) state.panels[i].zoom = parseFloat(z) || 1;
+  });
+  if (q.get('pans')) q.get('pans').split(',').forEach(function (p, i) {
+    if (state.panels[i]) state.panels[i].panX = parseFloat(p) || 0;
+  });
+  // Keep the toggle buttons honest about the scene the query asked for.
+  buildChoices(document.getElementById('layoutChoices'), LAYOUTS, state.layout, function (k) { state.layout = k; });
+  buildChoices(document.getElementById('gradeChoices'), GRADES, state.grade, function (k) { state.grade = k; });
+  buildChoices(document.getElementById('sizeChoices'), SIZES, state.size, function (k) { state.size = k; });
+  buildChapters();
+  syncPanelControls();
   var photo = 'samples/' + (q.get('photo') || 'pier') + '.jpg';
   if (shot === 'cover') {
     document.body.classList.add('shot-cover');
